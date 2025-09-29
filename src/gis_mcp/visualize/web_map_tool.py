@@ -2,6 +2,7 @@ import os
 import folium
 import geopandas as gpd
 from shapely import wkt
+from matplotlib import cm, colors
 from ..mcp import gis_mcp
 
 try:
@@ -25,12 +26,13 @@ def create_web_map(
 ):
     """
     Create an interactive web map (HTML) using Folium.
-    Each shapefile/layer gets its own label in the legend,
-    and the title updates dynamically when layers are toggled.
+    Supports unique per-feature coloring when 'column' is provided in style.
 
     Args:
         layers (list): List of dicts like {"data": "...", "style": {...}}
-                       - "style" may include {"label": "Layer Name", "color": "blue"}
+            - "style" may include:
+                {"label": "Layer Name", "color": "blue"}
+                {"column": "NAME_1", "cmap": "tab20"}  # for unique feature colors
         filename (str): Output HTML filename.
         title (str): Main map title.
         output_dir (str): Output directory for HTML.
@@ -43,16 +45,14 @@ def create_web_map(
             data = layer.get("data")
             style = layer.get("style", {})
             label = style.get("label", "Layer")
-            color = style.get("color", "blue")
 
-            # Read data
-            if isinstance(data, str) and data.endswith(".shp"):
-                gdf = gpd.read_file(data)
-            elif isinstance(data, str) and data.endswith(".geojson"):
-                gdf = gpd.read_file(data)
-            elif isinstance(data, str):
-                geom = wkt.loads(data)
-                gdf = gpd.GeoDataFrame(geometry=[geom], crs="EPSG:4326")
+            if isinstance(data, str):
+                data = os.path.abspath(data)
+                if data.lower().endswith((".shp", ".geojson")):
+                    gdf = gpd.read_file(data)
+                else:
+                    geom = wkt.loads(data)
+                    gdf = gpd.GeoDataFrame(geometry=[geom], crs="EPSG:4326")
             elif isinstance(data, gpd.GeoDataFrame):
                 gdf = data
             else:
@@ -60,30 +60,57 @@ def create_web_map(
 
             fields = [c for c in gdf.columns if c != gdf.geometry.name]
 
-            gj = folium.GeoJson(
-                gdf,
-                name=label,
-                style_function=lambda x, col=color: {
-                    "color": col,
-                    "fillColor": col,
-                    "weight": 2,
-                    "fillOpacity": 0.5,
-                },
-                tooltip=folium.GeoJsonTooltip(fields=fields, aliases=fields) if fields else None,
-            )
-            gj.add_to(m)
-            legend_items.append((label, color))
+            if "column" in style:
+                column = style["column"]
+                cmap = cm.get_cmap(style.get("cmap", "tab20"), len(gdf[column].unique()))
+                norm = colors.Normalize(vmin=0, vmax=len(gdf[column].unique()) - 1)
 
-        # Layer control
+                color_map = {
+                    val: colors.to_hex(cmap(i))
+                    for i, val in enumerate(sorted(gdf[column].unique()))
+                }
+
+                def style_func(feature):
+                    val = feature["properties"].get(column, "Unknown")
+                    col = color_map.get(val, "#000000")
+                    return {
+                        "color": "black",
+                        "fillColor": col,
+                        "weight": 1,
+                        "fillOpacity": 0.7,
+                    }
+
+                gj = folium.GeoJson(
+                    gdf,
+                    name=label,
+                    style_function=style_func,
+                    tooltip=folium.GeoJsonTooltip(fields=[column], aliases=[column]),
+                )
+                gj.add_to(m)
+
+                legend_items.extend([(val, col) for val, col in color_map.items()])
+
+            else:
+                color = style.get("color", "blue")
+                gj = folium.GeoJson(
+                    gdf,
+                    name=label,
+                    style_function=lambda x, col=color: {
+                        "color": col,
+                        "fillColor": col,
+                        "weight": 2,
+                        "fillOpacity": 0.5,
+                    },
+                    tooltip=folium.GeoJsonTooltip(fields=fields, aliases=fields) if fields else None,
+                )
+                gj.add_to(m)
+                legend_items.append((label, color))
+
         folium.LayerControl().add_to(m)
-
-        # Scale bar & lat/lon
         if show_grid:
             folium.LatLngPopup().add_to(m)
             if HAS_SCALEBAR:
                 ScaleBar(position="bottomleft").add_to(m)
-
-        # MiniMap
         if add_minimap:
             MiniMap(toggle_display=True, position="bottomright").add_to(m)
 
@@ -92,12 +119,14 @@ def create_web_map(
             legend_html = """
             <div style="
                 position: fixed; 
-                bottom: 50px; left: 50px; width: 200px; 
+                bottom: 50px; left: 50px; width: 220px; 
                 background-color: white; 
                 border:2px solid grey; 
                 z-index:9999; 
                 font-size:14px;
                 padding: 10px;
+                max-height: 300px;
+                overflow-y: auto;
             ">
             <b>Legend</b><br>
             """
@@ -106,7 +135,7 @@ def create_web_map(
             legend_html += "</div>"
             m.get_root().html.add_child(folium.Element(legend_html))
 
-        # Title & dynamic subtitle
+        # Title
         if title:
             title_html = f"""
                 <div id="mapTitle" style="
@@ -122,32 +151,16 @@ def create_web_map(
                     border-radius: 5px;
                     text-align: center;
                 ">
-                    {title}<br>
-                    <span id="layerTitle" style="font-size:14px; font-weight:normal;">Showing: All layers</span>
+                    {title}
                 </div>
             """
             m.get_root().html.add_child(folium.Element(title_html))
 
-            # Add JS to update subtitle on layer toggle
-            script = """
-            <script>
-            var map = window.map;
-            map.on('overlayadd', function(e) {
-                document.getElementById('layerTitle').innerHTML = 'Showing: ' + e.name;
-            });
-            map.on('overlayremove', function(e) {
-                document.getElementById('layerTitle').innerHTML = 'Showing: All layers';
-            });
-            </script>
-            """
-            m.get_root().html.add_child(folium.Element(script))
-
-        # Save file
         os.makedirs(output_dir, exist_ok=True)
-        output_path = os.path.join(output_dir, filename)
+        output_path = os.path.abspath(os.path.join(output_dir, filename))
         m.save(output_path)
 
         return {"status": "success", "message": f"Map created: {output_path}", "output_path": output_path}
 
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": f"create_web_map failed: {str(e)}"}

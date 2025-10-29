@@ -5,17 +5,11 @@
   <p><strong>Install GIS-MCP and transform your AI's spatial capabilities!</strong></p>
   <br/>
   <img src="docs/Logo.png" alt="GIS MCP Server Logo" width="300"/>
-  <br/>
-  <a href="docs/donate.md"><img src="https://img.shields.io/badge/Donate-ETH-orange?logo=ethereum&style=for-the-badge" alt="Donate ETH"/></a>
-  <br/>
+
   <br/>
 </div>
 
 A Model Context Protocol (MCP) server implementation that connects Large Language Models (LLMs) to GIS operations using GIS libraries, enabling AI assistants to perform geospatial operations and transformations.
-
----
-
-🌟 **Support GIS MCP with Ethereum (ETH)!** [Click here to donate or see instructions.](docs/donate.md)
 
 ---
 

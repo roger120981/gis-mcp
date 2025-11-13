@@ -115,8 +115,18 @@ pip install uv
 ```bash
 uv venv --python=3.10
 ```
+3. Activate the Virtual Environment:
 
-3. Install the package:
+On Windows:
+```
+/path/to/.venv/Scripts/activate
+```
+On Ubuntu:
+```
+source /path/to/.venv/bin/activate
+```
+
+4. Install the package:
 
 ```bash
 uv pip install gis-mcp
@@ -135,7 +145,7 @@ This will install additional dependencies:
 - `folium>=0.15.0` - For creating interactive web maps
 - `pydeck>=0.9.0` - For advanced 3D visualizations
 
-4. Start the server:
+5. Start the server:
 
 ```bash
 gis-mcp

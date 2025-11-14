@@ -3,7 +3,8 @@ import os
 import logging
 import numpy as np
 import geopandas as gpd
-from typing import Any, Dict, List, Optional
+import pandas as pd
+from typing import Any, Dict, List, Optional, Union
 from .mcp import gis_mcp
 
 # Configure logging
@@ -834,4 +835,508 @@ def build_and_transform_weights(
     except Exception as e:
         logger.error(f"Error in build_and_transform_weights: {str(e)}")
         return {"status": "error", "message": f"Failed to build and transform weights: {str(e)}"}
+
+
+@gis_mcp.tool()
+
+def spatial_markov(
+    shapefile_path: str,
+    value_columns: Union[str, List[str]],   # time-ordered, oldest -> newest
+    target_crs: str = "EPSG:4326",
+    weights_method: str = "queen",          # 'queen'|'rook'|'distance'
+    distance_threshold: float = 100000,     # meters (converted to degrees if 4326)
+    k: int = 5,                             # classes for y (quantile bins if continuous)
+    m: int = 5,                             # classes for spatial lags
+    fixed: bool = True,                     # pooled quantiles across all periods
+    permutations: int = 0,                  # >0 to get randomization p-values for x2
+    relative: bool = True,                  # divide each period by its mean
+    drop_na: bool = True,                   # drop features with any NA across time columns
+    fill_empty_classes: bool = True         # handle empty bins by making them self-absorbing
+) -> Dict[str, Any]:
+    """Run giddy Spatial Markov on a panel (n regions x t periods) from a shapefile."""
+    try:
+        # --- sanitize ---
+        for s in ("shapefile_path","target_crs","weights_method"):
+            v = locals()[s]
+            if isinstance(v, str):
+                locals()[s] = v.replace("`","")
+
+        if isinstance(value_columns, str):
+            value_cols = [c.strip() for c in value_columns.replace("`","").split(",") if c.strip()]
+        else:
+            value_cols = list(value_columns)
+
+        if not os.path.exists(shapefile_path):
+            return {"status": "error", "message": f"Shapefile not found: {shapefile_path}"}
+        if len(value_cols) < 2:
+            return {"status": "error", "message": "value_columns must include at least 2 time steps (wide format)."}
+
+        # --- load + project ---
+        gdf = gpd.read_file(shapefile_path)
+        missing = [c for c in value_cols if c not in gdf.columns]
+        if missing:
+            return {"status": "error", "message": f"Columns not found: {missing}"}
+
+        gdf = gdf.to_crs(target_crs)
+
+        # Ensure numeric
+        gdf[value_cols] = gdf[value_cols].apply(pd.to_numeric, errors="coerce")
+
+        # --- prepare Y (n x t) ---
+        Y = gdf[value_cols].to_numpy(copy=True).astype(float)  # shape (n, t)
+        if drop_na:
+            mask = ~np.any(np.isnan(Y), axis=1)
+            if mask.sum() < Y.shape[0]:
+                gdf = gdf.loc[mask].reset_index(drop=True)
+                Y = Y[mask, :]
+
+        # optional relative values (period-wise)
+        if relative:
+            col_means = Y.mean(axis=0)
+            col_means[col_means == 0] = 1.0
+            Y = Y / col_means
+
+        # --- spatial weights ---
+        import libpysal
+        wm = weights_method.lower()
+        if wm == "queen":
+            w = libpysal.weights.Queen.from_dataframe(gdf, use_index=True)
+        elif wm == "rook":
+            w = libpysal.weights.Rook.from_dataframe(gdf, use_index=True)
+        elif wm == "distance":
+            thr = distance_threshold
+            if target_crs.upper() == "EPSG:4326":
+                thr = distance_threshold / 111000.0  # meters -> degrees
+            w = libpysal.weights.DistanceBand.from_dataframe(
+                gdf, threshold=thr, binary=False, use_index=True
+            )
+        else:
+            return {"status":"error","message":f"Unknown weights_method: {weights_method}"}
+
+        w.transform = "r"
+
+        # handle islands by dropping rows and rebuilding weights
+        if w.islands:
+            keep_idx = [i for i in range(gdf.shape[0]) if i not in set(w.islands)]
+            if not keep_idx:
+                return {"status":"error","message":"All units are islands under current weights; adjust weights_method/threshold."}
+            gdf = gdf.iloc[keep_idx].reset_index(drop=True)
+            Y = Y[keep_idx, :]
+            if wm == "queen":
+                w = libpysal.weights.Queen.from_dataframe(gdf, use_index=True)
+            elif wm == "rook":
+                w = libpysal.weights.Rook.from_dataframe(gdf, use_index=True)
+            else:
+                thr = distance_threshold if target_crs.upper() != "EPSG:4326" else distance_threshold/111000.0
+                w = libpysal.weights.DistanceBand.from_dataframe(gdf, threshold=thr, binary=False, use_index=True)
+            w.transform = "r"
+
+        # --- Spatial Markov ---
+        try:
+            from giddy.markov import Spatial_Markov
+        except ModuleNotFoundError:
+            return {"status": "error", "message": "The 'giddy' package is not installed. Install with: pip install giddy"}
+
+        sm = Spatial_Markov(
+            Y, w,
+            k=int(k), m=int(m),
+            permutations=int(permutations),
+            fixed=bool(fixed),
+            discrete=False,
+            fill_empty_classes=bool(fill_empty_classes),
+            variable_name=";".join(value_cols)
+        )
+
+        # --- package results (JSON-safe) ---
+        def tolist(x):
+            try:
+                return np.asarray(x).tolist()
+            except Exception:
+                if isinstance(x, (list, tuple)):
+                    return [tolist(xx) for xx in x]
+                return x
+
+        # Safer preview: keep geometry, write WKT to a new column, then drop geometry
+        preview = gdf[[*value_cols, "geometry"]].head(5).copy()
+        preview["geometry_wkt"] = preview["geometry"].apply(
+            lambda g: g.wkt if g is not None and not g.is_empty else None
+        )
+        preview = pd.DataFrame(preview.drop(columns="geometry")).to_dict(orient="records")
+
+        result = {
+            "n_regions": int(Y.shape[0]),
+            "n_periods": int(Y.shape[1]),
+            "k_classes_y": int(k),
+            "m_classes_lag": int(m),
+            "weights_method": weights_method.lower(),
+            "value_columns": value_cols,
+            "discretization": {
+                "cutoffs_y": tolist(getattr(sm, "cutoffs", None)),
+                "cutoffs_lag": tolist(getattr(sm, "lag_cutoffs", None)),
+                "fixed": bool(fixed)
+            },
+            "global_transition_prob_p": tolist(sm.p),      # (k x k)
+            "conditional_transition_prob_P": tolist(sm.P), # (m x k x k)
+            "global_steady_state_s": tolist(sm.s),         # (k,)
+            "conditional_steady_states_S": tolist(sm.S),   # (m x k)
+            "tests": {
+                "chi2_total_x2": float(getattr(sm, "x2", np.nan)),
+                "chi2_df": int(getattr(sm, "x2_dof", -1)),
+                "chi2_pvalue": float(getattr(sm, "x2_pvalue", np.nan)),
+                "Q": float(getattr(sm, "Q", np.nan)),
+                "Q_p_value": float(getattr(sm, "Q_p_value", np.nan)),
+                "LR": float(getattr(sm, "LR", np.nan)),
+                "LR_p_value": float(getattr(sm, "LR_p_value", np.nan)),
+            },
+            "data_preview": preview,
+        }
+
+        msg = "Spatial Markov completed successfully"
+        if wm == "distance" and target_crs.upper() == "EPSG:4326":
+            msg += f" (threshold interpreted as {distance_threshold/111000.0:.6f} degrees)."
+
+        return {"status": "success", "message": msg, "result": result}
+
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to run Spatial Markov: {str(e)}"}
+
+@gis_mcp.tool()
+
+def dynamic_lisa(
+    shapefile_path: str,
+    value_columns: Union[str, List[str]],   # exactly two columns: [t0, t1]
+    target_crs: str = "EPSG:4326",
+    weights_method: str = "queen",          # 'queen'|'rook'|'distance'
+    distance_threshold: float = 100000,     # meters (converted to degrees if 4326)
+    k: int = 8,                             # number of rose sectors
+    permutations: int = 99,                 # 0 = skip inference
+    alternative: str = "two.sided",         # 'two.sided'|'positive'|'negative'
+    relative: bool = True,                  # divide each column by its mean
+    drop_na: bool = True                    # drop features with NA in either column
+) -> Dict[str, Any]:
+    """Run dynamic LISA (directional LISA) with giddy.directional.Rose.
+
+    Returns sector counts, angles, vector lengths, and (optionally) permutation p-values.
+    """
+    try:
+        # --- sanitize ---
+        for s in ("shapefile_path","target_crs","weights_method","alternative"):
+            v = locals()[s]
+            if isinstance(v, str):
+                locals()[s] = v.replace("`","")
+
+        if isinstance(value_columns, str):
+            cols = [c.strip() for c in value_columns.replace("`","").split(",") if c.strip()]
+        else:
+            cols = list(value_columns)
+
+        if not os.path.exists(shapefile_path):
+            return {"status":"error","message":f"Shapefile not found: {shapefile_path}"}
+        if len(cols) != 2:
+            return {"status":"error","message":"value_columns must be exactly two columns: [start_time, end_time]."}
+
+        # --- load + project ---
+        gdf = gpd.read_file(shapefile_path)
+        missing = [c for c in cols if c not in gdf.columns]
+        if missing:
+            return {"status":"error","message":f"Columns not found: {missing}"}
+        gdf = gdf.to_crs(target_crs)
+
+        # --- prepare Y (n x 2) ---
+        Y = gdf[cols].astype(float).to_numpy(copy=True)
+        if drop_na:
+            mask = ~np.any(np.isnan(Y), axis=1)
+            gdf = gdf.loc[mask].reset_index(drop=True)
+            Y = Y[mask, :]
+
+        if relative:
+            col_means = Y.mean(axis=0)
+            col_means[col_means == 0] = 1.0
+            Y = Y / col_means
+
+        # --- spatial weights ---
+        import libpysal
+        wm = weights_method.lower()
+        if wm == "queen":
+            w = libpysal.weights.Queen.from_dataframe(gdf, use_index=True)
+        elif wm == "rook":
+            w = libpysal.weights.Rook.from_dataframe(gdf, use_index=True)
+        elif wm == "distance":
+            thr = distance_threshold
+            if target_crs.upper() == "EPSG:4326":
+                thr = distance_threshold / 111000.0  # meters → degrees
+            w = libpysal.weights.DistanceBand.from_dataframe(gdf, threshold=thr, binary=False)
+        else:
+            return {"status":"error","message":f"Unknown weights_method: {weights_method}"}
+        w.transform = "r"
+
+        # drop islands (units with no neighbors)
+        if w.islands:
+            keep = [i for i in range(gdf.shape[0]) if i not in set(w.islands)]
+            if not keep:
+                return {"status":"error","message":"All units are islands under current weights."}
+            gdf = gdf.iloc[keep].reset_index(drop=True)
+            Y = Y[keep, :]
+            if wm == "queen":
+                w = libpysal.weights.Queen.from_dataframe(gdf, use_index=True)
+            elif wm == "rook":
+                w = libpysal.weights.Rook.from_dataframe(gdf, use_index=True)
+            else:
+                thr = distance_threshold if target_crs.upper() != "EPSG:4326" else distance_threshold/111000.0
+                w = libpysal.weights.DistanceBand.from_dataframe(gdf, threshold=thr, binary=False)
+            w.transform = "r"
+
+        # --- Dynamic LISA (Rose) ---
+        from giddy.directional import Rose
+        rose = Rose(Y, w, k=int(k))  # computes cuts, counts, theta, r, bins, lag internally
+
+        # permutation inference (optional)
+        pvals = None
+        expected_perm = larger_perm = smaller_perm = None
+        if permutations and permutations > 0:
+            rose.permute(permutations=int(permutations), alternative=alternative)
+            pvals = np.asarray(getattr(rose, "p", None)).tolist() if hasattr(rose, "p") else None
+            expected_perm = np.asarray(getattr(rose, "expected_perm", [])).tolist()
+            larger_perm = np.asarray(getattr(rose, "larger_perm", [])).tolist()
+            smaller_perm = np.asarray(getattr(rose, "smaller_perm", [])).tolist()
+
+        # preview
+        def _wkt_safe(g):
+            try:
+                return g.wkt
+            except Exception:
+                return str(g)
+
+        preview = gdf[[*cols, gdf.geometry.name]].head(5).copy()
+        preview[gdf.geometry.name] = preview[gdf.geometry.name].apply(_wkt_safe)
+        preview = preview.rename(columns={gdf.geometry.name: "geometry_wkt"}).to_dict(orient="records")
+
+        result = {
+            "n_regions": int(Y.shape[0]),
+            "k_sectors": int(k),
+            "weights_method": wm,
+            "value_columns": cols,
+            "cuts_radians": np.asarray(rose.cuts).tolist(),        # sector edges
+            "sector_counts": np.asarray(rose.counts).tolist(),     # count per sector
+            "angles_theta_rad": np.asarray(rose.theta).tolist(),   # one per region
+            "vector_lengths_r": np.asarray(rose.r).tolist(),       # one per region
+            "bins_used": np.asarray(rose.bins).tolist(),
+            "inference": {
+                "permutations": int(permutations),
+                "alternative": alternative,
+                "p_values_by_sector": pvals,
+                "expected_counts_perm": expected_perm,
+                "larger_or_equal_counts": larger_perm,
+                "smaller_or_equal_counts": smaller_perm
+            },
+            "data_preview": preview
+        }
+
+        msg = "Dynamic LISA (Rose) completed successfully"
+        if wm == "distance" and target_crs.upper() == "EPSG:4326":
+            msg += f" (threshold interpreted as {distance_threshold/111000.0:.6f} degrees)."
+
+        return {"status":"success","message":msg,"result":result}
+
+    except Exception as e:
+        return {"status":"error","message":f"Failed to run Dynamic LISA: {str(e)}"}
+
+@gis_mcp.tool()
+
+def gm_lag(
+    shapefile_path: str,
+    y_col: str,                               # dependent variable
+    x_cols: Union[str, List[str]],            # exogenous regressors (no constant)
+    target_crs: str = "EPSG:4326",
+    weights_method: str = "queen",            # 'queen'|'rook'|'distance'
+    distance_threshold: float = 100000,       # meters; auto→degrees for EPSG:4326
+    # IV/GMM config
+    w_lags: int = 1,                          # instruments: WX, WWX, ...
+    lag_q: bool = True,                       # also lag external instruments q
+    yend_cols: Union[None, str, List[str]] = None,  # other endogenous regressors (optional)
+    q_cols: Union[None, str, List[str]] = None,     # their external instruments (optional)
+    # Inference options
+    robust: Union[None, str] = None,          # None | 'white' | 'hac'
+    hac_bandwidth: float = None,              # only used if robust='hac'
+    spat_diag: bool = True,                   # AK test
+    sig2n_k: bool = False,                    # variance uses n-k if True
+    drop_na: bool = True                      # drop rows with NA in y/x/yend/q
+) -> Dict[str, Any]:
+    """
+    Run spreg.GM_Lag (spatial 2SLS / GMM-IV spatial lag model) on a cross-section.
+
+    Returns coefficients with SE/z/p, fit metrics, (optional) AK test, and a small data preview.
+    """
+    try:
+        # --- sanitize inputs ---
+        for s in ("shapefile_path","target_crs","weights_method"):
+            v = locals()[s]
+            if isinstance(v, str):
+                locals()[s] = v.replace("`","")
+
+        if isinstance(x_cols, str):
+            x_cols_list = [c.strip() for c in x_cols.split(",") if c.strip()]
+        else:
+            x_cols_list = list(x_cols)
+
+        if isinstance(yend_cols, str):
+            yend_cols_list = [c.strip() for c in yend_cols.split(",") if c.strip()]
+        elif yend_cols is None:
+            yend_cols_list = None
+        else:
+            yend_cols_list = list(yend_cols)
+
+        if isinstance(q_cols, str):
+            q_cols_list = [c.strip() for c in q_cols.split(",") if c.strip()]
+        elif q_cols is None:
+            q_cols_list = None
+        else:
+            q_cols_list = list(q_cols)
+
+        if not os.path.exists(shapefile_path):
+            return {"status": "error", "message": f"Shapefile not found: {shapefile_path}"}
+        if not x_cols_list:
+            return {"status": "error", "message": "x_cols must include at least one regressor."}
+
+        # --- load + project ---
+        gdf = gpd.read_file(shapefile_path)
+        needed = [y_col] + x_cols_list + (yend_cols_list or []) + (q_cols_list or [])
+        missing = [c for c in needed if c not in gdf.columns]
+        if missing:
+            return {"status": "error", "message": f"Columns not found: {missing}"}
+
+        gdf = gdf.to_crs(target_crs)
+
+        # --- coerce numerics & subset ---
+        gdf[needed] = gdf[needed].apply(pd.to_numeric, errors="coerce")
+        data = gdf[needed + [gdf.geometry.name]].copy()
+
+        if drop_na:
+            before = data.shape[0]
+            data = data.dropna(subset=needed)
+            after = data.shape[0]
+            if after == 0:
+                return {"status": "error", "message": "All rows dropped due to NA in y/x/yend/q."}
+            if after < before:
+                gdf = gdf.loc[data.index].reset_index(drop=True)
+                data = data.reset_index(drop=True)
+
+        # --- arrays for spreg ---
+        y = data[[y_col]].to_numpy(dtype=float)              # (n,1)
+        X = data[x_cols_list].to_numpy(dtype=float)          # (n,k), no constant
+        YEND = None if not yend_cols_list else data[yend_cols_list].to_numpy(dtype=float)
+        Q = None if not q_cols_list else data[q_cols_list].to_numpy(dtype=float)
+
+        # --- spatial weights ---
+        import libpysal
+        wm = weights_method.lower()
+        if wm == "queen":
+            w = libpysal.weights.Queen.from_dataframe(gdf.loc[data.index], use_index=True)
+        elif wm == "rook":
+            w = libpysal.weights.Rook.from_dataframe(gdf.loc[data.index], use_index=True)
+        elif wm == "distance":
+            thr = distance_threshold if target_crs.upper() != "EPSG:4326" else distance_threshold / 111000.0
+            w = libpysal.weights.DistanceBand.from_dataframe(
+                gdf.loc[data.index], threshold=thr, binary=False, use_index=True
+            )
+        else:
+            return {"status":"error","message":f"Unknown weights_method: {weights_method}"}
+        w.transform = "r"
+
+        # Drop islands and re-align data if needed
+        if w.islands:
+            keep = [i for i in range(len(gdf.loc[data.index])) if i not in set(w.islands)]
+            if not keep:
+                return {"status":"error","message":"All units are islands under current weights."}
+            # reindex everything
+            y = y[keep, :]
+            X = X[keep, :]
+            if YEND is not None: YEND = YEND[keep, :]
+            if Q is not None: Q = Q[keep, :]
+            sub_gdf = gdf.loc[data.index].iloc[keep]
+            if wm == "queen":
+                w = libpysal.weights.Queen.from_dataframe(sub_gdf, use_index=True)
+            elif wm == "rook":
+                w = libpysal.weights.Rook.from_dataframe(sub_gdf, use_index=True)
+            else:
+                thr = distance_threshold if target_crs.upper() != "EPSG:4326" else distance_threshold / 111000.0
+                w = libpysal.weights.DistanceBand.from_dataframe(sub_gdf, threshold=thr, binary=False, use_index=True)
+            w.transform = "r"
+
+        # --- HAC kernel weights if requested ---
+        gwk = None
+        if robust == "hac":
+            # Build Kernel weights on centroids; ensure ones on diagonal
+            coords = np.column_stack([gdf.loc[data.index].geometry.centroid.x,
+                                      gdf.loc[data.index].geometry.centroid.y])
+            bw = hac_bandwidth or (np.ptp(coords[:,0]) + np.ptp(coords[:,1])) / 20.0
+            gwk = libpysal.weights.Kernel(coords, bandwidth=bw, fixed=True, function="triangular", diagonal=True)
+            gwk.transform = "r"
+
+        # --- fit GM_Lag ---
+        try:
+            from spreg import GM_Lag
+        except ModuleNotFoundError:
+            return {"status": "error", "message": "The 'spreg' package is not installed. Install with: pip install spreg"}
+
+        reg = GM_Lag(
+            y, X,
+            yend=YEND, q=Q,
+            w=w,
+            w_lags=int(w_lags),
+            lag_q=bool(lag_q),
+            robust=robust,               # None | 'white' | 'hac'
+            gwk=gwk,                     # required if robust='hac'
+            sig2n_k=bool(sig2n_k),
+            spat_diag=bool(spat_diag),
+            name_y=y_col,
+            name_x=x_cols_list,
+            name_yend=(yend_cols_list or None),
+            name_q=(q_cols_list or None),
+            name_w=f"{weights_method}"
+        )
+
+        # --- package outputs ---
+        def arr(x): return None if x is None else np.asarray(x).tolist()
+        def zpack(z_list):
+            # z_stat is list of (z, p)
+            return [{"z": float(zp[0]), "p": float(zp[1])} for zp in (z_list or [])]
+
+        # tiny preview (avoid geometry dtype issues)
+        preview = gdf.loc[data.index, [y_col, *x_cols_list, gdf.geometry.name]].head(5).copy()
+        preview["geometry_wkt"] = preview[gdf.geometry.name].apply(lambda g: g.wkt if g is not None else None)
+        preview = pd.DataFrame(preview.drop(columns=[gdf.geometry.name])).to_dict(orient="records")
+
+        result = {
+            "n_obs": int(reg.n),
+            "k_vars": int(reg.k),  # includes constant internally
+            "dependent": y_col,
+            "exog": x_cols_list,
+            "endog": yend_cols_list,
+            "instruments": q_cols_list,
+            "weights_method": weights_method.lower(),
+            "spec": {"w_lags": int(w_lags), "lag_q": bool(lag_q), "robust": robust, "sig2n_k": bool(sig2n_k)},
+            "betas": [float(b) for b in np.asarray(reg.betas).flatten()],
+            "beta_names": (["const"] + x_cols_list + (yend_cols_list or []) + ["W_y"])[:len(np.asarray(reg.betas).flatten())],
+            "std_err": arr(reg.std_err),
+            "z_stats": zpack(getattr(reg, "z_stat", None)),
+            "pseudo_r2": float(getattr(reg, "pr2", np.nan)),
+            "pseudo_r2_reduced": float(getattr(reg, "pr2_e", np.nan)),
+            "sig2": float(getattr(reg, "sig2", np.nan)),
+            "ssr": float(getattr(reg, "utu", np.nan)),
+            "ak_test": arr(getattr(reg, "ak_test", None)),  # [stat, p] if spat_diag=True
+            "pred_y_head": [float(v) for v in np.asarray(reg.predy).flatten()[:5]],
+            "data_preview": preview
+        }
+
+        msg = "GM_Lag estimation completed successfully"
+        if wm == "distance" and target_crs.upper() == "EPSG:4326":
+            msg += f" (threshold interpreted as {distance_threshold/111000.0:.6f} degrees)."
+        if robust == "hac":
+            msg += f" (HAC bandwidth ~ {bw:.3f})."
+
+        return {"status": "success", "message": msg, "result": result}
+
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to run GM_Lag: {str(e)}"}
 

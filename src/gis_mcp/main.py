@@ -109,7 +109,7 @@ def main():
             print(f"MCP endpoint will be available at: http://{host}:{port}/mcp")
             logger.info(f"{transport} transport enabled - {host}:{port}")
             
-            gis_mcp.run(transport, host, port)
+            gis_mcp.run(transport=transport, host=host, port=port)
             
     except KeyboardInterrupt:
         logger.info("Server stopped by user")

@@ -41,7 +41,7 @@ RUN pip install --no-cache-dir --no-deps .
 
 # Install any remaining dependencies
 RUN pip install --no-cache-dir \
-    mcp==2.13.1 \
+    fastmcp==2.13.1 \
     tabulate>=0.9.0 \
     libpysal>=4.13.0 \
     esda>=2.7.0 \

@@ -55,19 +55,23 @@ GIS_MCP_TRANSPORT=http GIS_MCP_HOST=localhost GIS_MCP_PORT=8000 gis-mcp
 
 ## Docker Usage
 
-### STDIO Mode (Default)
-```bash
-# Default behavior - no changes needed
-docker run your-gis-mcp-image
-```
+**Note:** Both `Dockerfile` and `Dockerfile.local` have **HTTP transport mode enabled by default** with port `9010`.
 
-### HTTP Mode
+### HTTP Mode (Default in Docker)
 ```bash
-# Enable HTTP transport and expose port
-docker run -e GIS_MCP_TRANSPORT=http -p 8080:8080 your-gis-mcp-image
+# HTTP mode is the default - just expose the port
+docker run -p 9010:9010 your-gis-mcp-image
 
 # Custom port
-docker run -e GIS_MCP_TRANSPORT=http -e GIS_MCP_PORT=9000 -p 9000:9000 your-gis-mcp-image
+docker run -e GIS_MCP_PORT=9000 -p 9000:9000 your-gis-mcp-image
+```
+
+The server will be available at `http://localhost:9010/mcp` (or your custom port).
+
+### STDIO Mode
+```bash
+# Override to use STDIO transport instead
+docker run -e GIS_MCP_TRANSPORT=stdio your-gis-mcp-image
 ```
 
 ## Client Connection
@@ -92,7 +96,6 @@ http://your-server:8080/mcp
 This implementation maintains full backward compatibility:
 - Existing deployments continue to work without changes
 - Default behavior remains STDIO transport
-- Smithery configurations are unaffected
 - No breaking changes to the API
 
 ## Troubleshooting

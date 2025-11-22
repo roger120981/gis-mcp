@@ -27,6 +27,7 @@ nav:
           - Developers: install/developers.md
       - Configuration:
           - HTTP Transport: http-transport.md
+      - GIS AI Agent: gis-ai-agent.md
       - API Reference:
           - Data Gathering:
               - Overview: data-gathering/README.md

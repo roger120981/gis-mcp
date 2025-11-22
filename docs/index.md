@@ -228,6 +228,7 @@ html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
     </div>
     <nav class="nav-links">
       <a href="getting-started/">Getting Started</a>
+      <a href="gis-ai-agent/">GIS AI Agent</a>
       <a href="install/">Installations</a>
       <a href="api/shapely/">API Reference</a>
       <a href="examples/">Examples</a>
@@ -243,15 +244,9 @@ html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
       <div class="slogan">GIS MCP Server is the backend for your GIS AI Agent</div>
       <p class="sub">The MCP server that connects GIS Libraries(Shapely, PyProj, GeoPandas, Rasterio, and PySAL, etc) to LLMs — enabling precise geospatial operations, projections, raster processing, and spatial statistics in natural language workflows.</p>
       <div class="cta-row">
-        <a class="btn" href="getting-started/">Getting Started</a>
+        <a class="btn" href="gis-ai-agent/">Build GIS AI Agent</a>
         <a class="btn secondary" href="api/shapely/">Explore API</a>
       </div>
-      <!-- Begin Substack Signup Form -->
-      <form action="https://gismcp.substack.com/subscribe" method="post" target="_blank" style="margin: 2em 0; display: flex; justify-content: center; gap: 0.5em; flex-wrap: wrap;">
-        <input type="email" name="email" placeholder="Your email" required style="padding: 0.5em; min-width: 220px; border-radius: 6px; border: 1px solid #ccc;">
-        <button type="submit" style="padding: 0.5em 1em; border-radius: 6px; background: #7cc5ff; color: #0b1b2b; border: none; font-weight: 700; cursor: pointer;">Subscribe for GIS AI News</button>
-      </form>
-      <!-- End Substack Signup Form -->
     </div>
     
   </section>

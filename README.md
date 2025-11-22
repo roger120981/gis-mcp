@@ -369,6 +369,32 @@ After configuration:
 3. Restart your IDE to apply the changes
 4. You can now use all GIS operations through Claude or Cursor!
 
+## 🤖 Build Your First GIS AI Agent
+
+Ready to create your own AI agent that can perform geospatial operations? Our comprehensive tutorial will guide you from zero to hero!
+
+### What You'll Learn
+
+- ✅ How to set up the GIS MCP server in HTTP mode
+- ✅ How to build a LangChain agent from scratch
+- ✅ How to connect your agent to GIS tools
+- ✅ How to use OpenRouter to access multiple AI models (DeepSeek, Gemini, GPT-4, Claude, etc.)
+- ✅ How to customize and extend your agent
+
+### Get Started
+
+👉 **[Follow the complete tutorial →](https://gis-mcp.com/gis-ai-agent/)**
+
+The tutorial is beginner-friendly and requires no prior AI or GIS experience. You'll build a working agent that can:
+
+- Calculate distances between points
+- Transform coordinates between different systems
+- Create buffers around locations
+- Perform spatial analysis
+- And much more!
+
+**Perfect for**: Developers, data scientists, GIS professionals, and anyone interested in building AI-powered geospatial applications.
+
 ## 📚 Available Functions
 
 This section provides a comprehensive list of all available functions organized by library.

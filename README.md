@@ -386,6 +386,8 @@ Ready to create your own AI agent that can perform geospatial operations? Our co
 
 👉 **[Follow the complete tutorial →](https://gis-mcp.com/gis-ai-agent/)**
 
+📝 **[Read the Medium article →](https://medium.com/@mahdinazari75/build-your-first-gis-ai-agent-by-gis-mcp-server-langchain-c0c1bfa36f6d)**
+
 The tutorial is beginner-friendly and requires no prior AI or GIS experience. You'll build a working agent that can:
 
 - Calculate distances between points

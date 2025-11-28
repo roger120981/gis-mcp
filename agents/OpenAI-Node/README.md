@@ -9,13 +9,12 @@ Welcome! This tutorial will guide you on setting up the gis-mcp server and build
 - [What You'll Build](#what-youll-build)
 - [Prerequisites](#prerequisites)
 - [Step 1: Install GIS MCP Server](#step-1-install-gis-mcp-server)
-- [Step 2: Install Agent Dependencies](#step-2-install-agent-dependencies)
-- [Step 3: Get Your OpenAI API Key](#step-3-get-your-openai-api-key)
+- [Step 2: Get Your OpenAI API Key](#step-3-get-your-openai-api-key)
 - [Security Notice](#security-notice)
-- [Step 4: Install Nodejs Dependencies](#step-4-install-nodejs-dependencies)
-- [Step 5: Start the MCP Server](#step-5-start-the-mcp-server)
-- [Step 6: Run the Agent Code](#step-6-run-the-agent-code)
-- [Step 7: Next Steps](#step-7-next-steps)
+- [Step 3: Install Nodejs Dependencies](#step-4-install-nodejs-dependencies)
+- [Step 4: Start the MCP Server](#step-5-start-the-mcp-server)
+- [Step 5: Run the Agent Code](#step-6-run-the-agent-code)
+- [Step 6: Next Steps](#step-7-next-steps)
 
 
 ## What You'll Build
@@ -95,43 +94,7 @@ You should see help text. If you get an error, make sure your virtual environmen
 
 ---
 
-## Step 2: Install Agent Dependencies
-
-Now let's install the packages needed to build your agent with LangChain.
-
-1. **Create a requirements file** (or install directly):
-
-   Create a file named `requirements.txt` in your project folder with this content:
-
-   ```
-   langchain>=1.0.0
-   langchain-openai>=1.0.0
-   langchain-core>=1.0.0
-   langchain-mcp-adapters>=0.1.0
-   python-dotenv>=1.0.0
-   ```
-
-2. **Install the dependencies**:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-   Or install them one by one:
-
-   ```bash
-   pip install langchain langchain-openai langchain-core langchain-mcp-adapters python-dotenv
-   ```
-
-**✅ Verification**: Check that LangChain is installed:
-
-```bash
-python -c "import langchain; print('LangChain installed successfully!')"
-```
-
----
-
-## Step 3: Get Your OpenAI API Key
+## Step 2: Get Your OpenAI API Key
 
 To let your Node.js agent talk to OpenAI, you'll need an API key. You can easily get one by using this link. [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
@@ -146,7 +109,7 @@ OPENAI_API_KEY=your_key_here
 ## Security Notice
 Before you go any further, make sure your `.env` file is protected. This file contains your API key, and you should never commit it to GitHub or share it with anyone. The safest way to handle this is to add `.env` to your `.gitignore` file so it stays out of version control automatically. If your project doesn’t have a `.gitignore` yet, create one in the project root and include `.env` inside it. Once that’s in place, Git will ignore the file completely, and you won’t have to worry about leaking secrets when you push your code.
 
-## Step 4: Install Node.js Dependencies
+## Step 3: Install Node.js Dependencies
 
 In your folder, initialize a Node.js project:
 
@@ -162,7 +125,7 @@ npm install @openai/agents openai dotenv
 
 You are now ready to build your agent.
 
-## Step 5: Start the MCP Server
+## Step 4: Start the MCP Server
 
 The MCP server needs to be running for your agent to use GIS tools. Let's start it in HTTP mode.
 
@@ -172,7 +135,7 @@ The MCP server needs to be running for your agent to use GIS tools. Let's start 
 
 ```powershell
 # Navigate to your project folder
-cd gis-agent-project
+cd gis-node-js-project
 
 # Activate your virtual environment
 .\.venv\Scripts\Activate.ps1
@@ -186,7 +149,9 @@ $env:GIS_MCP_PORT="9010"
 gis-mcp
 ```
 
-## Step 6: Run the Agent Code
+Keep the server window open while you work. The Node agent depends on this process running in the background, and if you close that terminal, the agent won't be able to reach the MCP server. Just leave it running and open a separate terminal when you switch to the Node.js part.
+
+## Step 5: Run the Agent Code
 
 Create a new file called `app.js` and paste the agent code into it:
 
@@ -235,7 +200,7 @@ node app.js
 
 Your agent connects to the MCP server, discovers its available tools, and uses them to answer the geospatial question. The final computed answer appears in your terminal.
 
-## Step 7: Next Steps
+## Step 6: Next Steps
 
 You can now experiment with more GIS operations such as coordinate transformations, buffering, area calculations, and more. The agent will use the MCP server for any question requiring geospatial logic.
 

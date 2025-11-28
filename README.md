@@ -752,7 +752,7 @@ For support, please open an issue in the GitHub repository.
 
 Join our Discord community for discussions, updates, and support:
 
-[![Join our Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/dzkXZsZK)
+[![Join our Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/SeVmVhVbk)
 
 ## 👥 Contributors
 

@@ -27,7 +27,10 @@ nav:
           - Developers: install/developers.md
       - Configuration:
           - HTTP Transport: http-transport.md
-      - GIS AI Agent: gis-ai-agent.md
+      - GIS AI Agent:
+          - Overview: gis-ai-agent/README.md
+          - Langchain (Python): gis-ai-agent/langchain.md
+          - OpenAI (NodeJs): gis-ai-agent/openai-nodejs.md
       - API Reference:
           - Data Gathering:
               - Overview: data-gathering/README.md

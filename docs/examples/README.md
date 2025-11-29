@@ -27,9 +27,11 @@ This section contains practical, step-by-step examples for using GIS MCP Server 
   - Download, visualize, and analyze climate raster data (e.g., Temperature) using GIS MCP Server & Claude Desktop.
   - Learn how to clip rasters, calculate zonal statistics, and export results for further analysis.
 
-- [**Example 5: Build Your First GIS AI Agent (LangChain)**](../gis-ai-agent.md)
+- [**Example 5: Build Your First GIS AI Agent**](../gis-ai-agent/README.md)
 
-  - Create your own AI agent from scratch using LangChain and the GIS MCP Server.
+  - Create your own AI agent from scratch using the GIS MCP Server.
+  - Available in two flavors:
+    - **[LangChain (Python)](../gis-ai-agent/langchain.md)**: Step-by-step tutorial from zero to hero. Integrate with OpenRouter to access multiple AI models (DeepSeek, Gemini, GPT-4, Claude, etc.).
+    - **[OpenAI (NodeJs)](../gis-ai-agent/openai-nodejs.md)**: Perfect for JavaScript/TypeScript developers using OpenAI's Agent SDK.
   - Learn how to build a complete agent that can perform geospatial operations through natural language.
-  - Step-by-step tutorial from zero to hero - no prior experience needed.
-  - Integrate with OpenRouter to access multiple AI models (DeepSeek, Gemini, GPT-4, Claude, etc.).
+  - No prior AI or GIS experience needed.

@@ -36,24 +36,8 @@ Build a GIS AI agent using OpenAI's Agent SDK in Node.js. This tutorial is perfe
 - ✅ Step-by-step tutorial with clear instructions
 - ✅ Perfect for JavaScript/TypeScript developers
 
-## Prerequisites
-
-Before you start, make sure you have:
-
-- **Python 3.10 or higher** (for Langchain agent) or **Node.js v24.11.1 or higher** (for OpenAI-Nodejs agent)
-- **GIS MCP Server** installed and running
-- **A code editor** (VS Code, PyCharm, or any text editor)
-- **An internet connection** for installing packages
-- **Basic command line knowledge**
-
-## Getting Started
-
-1. Choose the agent framework that matches your preferred programming language
-2. Follow the step-by-step tutorial for your chosen framework
-3. Start building amazing geospatial AI applications!
-
 ## Need Help?
 
 - Check the [troubleshooting sections](langchain.md#troubleshooting) in the individual tutorials
 - Visit our [GitHub repository](https://github.com/mahdin75/gis-mcp) for more examples
-- Join our [Discord community](https://discord.gg/dzkXZsZK) for support
+- Join our [Discord community](https://discord.gg/SeVmVhVbk) for support

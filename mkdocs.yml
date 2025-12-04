@@ -26,6 +26,7 @@ nav:
           - pip: install/pip.md
           - Developers: install/developers.md
       - Configuration:
+          - Storage Configuration: storage-configuration.md
           - HTTP Transport: http-transport.md
       - GIS AI Agent:
           - Overview: gis-ai-agent/README.md

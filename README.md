@@ -26,8 +26,6 @@
 
 A Model Context Protocol (MCP) server implementation that connects Large Language Models (LLMs) to GIS operations using GIS libraries, enabling AI assistants to perform geospatial operations and transformations.
 
----
-
 🌐 **Website:** [gis-mcp.com](https://gis-mcp.com)
 
 > Current version is 0.12.0 (Beta):
@@ -44,6 +42,7 @@ A Model Context Protocol (MCP) server implementation that connects Large Languag
 
 - [Features](#-features)
 - [Prerequisites](#-prerequisites)
+- [Vibe Coding](#vibe-coding)
 - [Installation](#-installation)
   - [Docker Installation](#-docker-installation)
   - [pip Installation](#-pip-installation)
@@ -94,6 +93,13 @@ GIS MCP Server empowers AI assistants with advanced geospatial intelligence. Key
 - Python 3.10 or higher
 - MCP-compatible client (like Claude Desktop or Cursor)
 - Internet connection for package installation
+
+## Vibe Coding
+
+If you’re building agents via vibe coding, use these context files in your editor so the LLM understands the GIS MCP server:
+
+- `llms.txt`: summarized context for smaller windows.
+- `llms-full.txt`: full context when your model has a larger window.
 
 ## 🛠 Installation
 

@@ -2,6 +2,8 @@
 
 This guide helps you install and run the GIS MCP Server quickly using pip (with uv) and shows how to connect it to your IDE/client.
 
+> Quick tip: keep `gis-mcp-context-llm.txt` open/pinned in your editor (Cursor, Claude Desktop, etc.) so your AI agent has a ready-made summary of the GIS MCP tools and startup commands.
+
 ### Prerequisites
 
 - Python 3.10+
@@ -49,6 +51,7 @@ The GIS MCP Server uses a configurable storage directory for file operations (re
 You can specify a custom storage folder using either:
 
 1. **Command-line argument:**
+
    ```bash
    gis-mcp --storage-path /path/to/your/storage
    ```
@@ -62,6 +65,7 @@ You can specify a custom storage folder using either:
 #### Default Storage Location
 
 If no storage path is specified, the server uses the default location:
+
 - **Default path:** `~/.gis_mcp/data/` (e.g., `/home/username/.gis_mcp/data/` on Linux, `C:\Users\username\.gis_mcp\data\` on Windows)
 
 The storage directory is automatically created if it doesn't exist.
@@ -94,6 +98,7 @@ For Claude Desktop or Cursor IDE, you can specify the storage path in your confi
 ```
 
 Or use an environment variable in your shell configuration (`.bashrc`, `.zshrc`, etc.):
+
 ```bash
 export GIS_MCP_STORAGE_PATH=/custom/path/to/storage
 ```

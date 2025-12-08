@@ -12,6 +12,7 @@
 [![Build Agent with OpenAI NodeJS](https://img.shields.io/badge/OpenAI%20NodeJS-111827?logo=openai&logoColor=white)](https://gis-mcp.com/gis-ai-agent/openai-nodejs)
 [![YouTube](https://img.shields.io/badge/YouTube-B91C1C?logo=youtube&logoColor=white)](https://www.youtube.com/@gis-mcp)
 [![Discord](https://img.shields.io/badge/Discord-7289DA?logo=discord&logoColor=white)](https://discord.gg/SeVmVhVbk)
+[![Vibe Coding](https://img.shields.io/badge/Vibe%20Coding-Context%20Files-6C5CE7)](#vibe-coding)
 
 </div>
 

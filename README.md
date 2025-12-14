@@ -6,6 +6,13 @@
 [![Docker Installation](https://img.shields.io/badge/Docker-Installation-2496ED?logo=docker&logoColor=white)](https://gis-mcp.com/install/docker/)
 [![Downloads](https://static.pepy.tech/personalized-badge/gis-mcp?period=total&units=international_system&left_color=grey&right_color=blue&left_text=PyPI%20downloads)](https://pepy.tech/project/gis-mcp)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/mahdin75/gis-mcp)
+<br/>
+[![Climate](https://img.shields.io/badge/Climate-Data-B91C1C?logo=weather&logoColor=white)](https://gis-mcp.com/climate-data-functions/)
+[![Biodiversity](https://img.shields.io/badge/Biodiversity-Data-4CAF50?logo=leaf&logoColor=white)](https://gis-mcp.com/ecology-data-functions/)
+[![LandCover](https://img.shields.io/badge/LandCover-Data-5D4037?logo=map&logoColor=white)](https://gis-mcp.com/land-cover-data-functions/)
+[![Movement](https://img.shields.io/badge/Movement-Data-FF6B35?logo=person-walking&logoColor=white)](https://gis-mcp.com/movement-data-functions/)
+[![Satellite](https://img.shields.io/badge/Satellite-Imagery-6C5CE7?logo=satellite&logoColor=white)](https://gis-mcp.com/satellite-imagery-functions/)
+[![Administrative](https://img.shields.io/badge/Administrative-Boundaries-7289DA?logo=map&logoColor=white)](https://gis-mcp.com/administrative-boundaries-functions/)
 [![Transport](https://img.shields.io/badge/Transport-HTTP%20%7C%20stdio-blue)](https://github.com/mahdin75/gis-mcp)
 [![Storage Config](https://img.shields.io/badge/Storage-Supported-4CAF50?logo=files&logoColor=white)](https://gis-mcp.com/storage-configuration/)
 [![Build Agent with LangChain](https://img.shields.io/badge/LangChain-Build%20AI%20Agent-FF6B35?logo=langchain&logoColor=white)](https://gis-mcp.com/gis-ai-agent/langchain)

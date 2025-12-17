@@ -453,9 +453,9 @@ def is_valid(geometry: str) -> Dict[str, Any]:
 def make_valid(geometry: str) -> Dict[str, Any]:
     """Make a geometry valid."""
     try:
-        from shapely import wkt
+        from shapely import wkt, make_valid
         geom = wkt.loads(geometry)
-        result = geom.make_valid()
+        result = make_valid(geom)
         return {
             "status": "success",
             "geometry": result.wkt,
@@ -582,14 +582,14 @@ def geometry_to_geojson(geometry: str) -> Dict[str, Any]:
 @gis_mcp.tool()
 def geojson_to_geometry(geojson: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Convert GeoJSON to a Shapely geometry using shapely.shape.
+    Convert GeoJSON to a Shapely geometry using shapely.geometry.shape.
     Args:
         geojson: GeoJSON dictionary.
     Returns:
         Dictionary with status, message, and geometry as WKT.
     """
     try:
-        from shapely import shape
+        from shapely.geometry import shape
         geom = shape(geojson)
         return {
             "status": "success",

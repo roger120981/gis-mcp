@@ -46,7 +46,11 @@ def read_file_gpd(file_path: str) -> Dict[str, Any]:
             raise FileNotFoundError(f"File not found: {file_path}")
 
         gdf = gpd.read_file(file_path)
-        preview = gdf.head(5).to_dict(orient="records")
+        # Convert geometry to WKT for serialization
+        preview_df = gdf.head(5).copy()
+        if 'geometry' in preview_df.columns:
+            preview_df['geometry'] = preview_df['geometry'].apply(lambda g: g.wkt if g is not None else None)
+        preview = preview_df.to_dict(orient="records")
         
         return {
             "status": "success",
@@ -139,15 +143,18 @@ def merge_gpd(shapefile1_path: str, shapefile2_path: str, output_path: str) -> D
         # We can drop its geometry column to make the merge cleaner and more memory-efficient.
         right_df = pd.DataFrame(gpd.read_file(shapefile2_path).drop(columns='geometry'))
 
-         # Step 2: Perform the merge operation using the optimized geopandas.merge.
+         # Step 2: Perform the merge operation using pandas.merge.
         # This function correctly handles the geometry of the left GeoDataFrame.
         logger.info(f"Performing merge...")
-        merged_gdf = gpd.merge(
+        merged_df = pd.merge(
             left_gdf,
             right_df,
             how='inner',  # Default to inner merge
             suffixes=('_left', '_right')
         )
+        
+        # Convert back to GeoDataFrame to preserve geometry and CRS
+        merged_gdf = gpd.GeoDataFrame(merged_df, crs=left_gdf.crs)
 
         if merged_gdf.empty:
             logger.warning("The merge result is empty. No matching records were found.")
@@ -196,7 +203,11 @@ def overlay_gpd(gdf1_path: str, gdf2_path: str, how: str = "intersection", outpu
             output_path_resolved.parent.mkdir(parents=True, exist_ok=True)
             result.to_file(str(output_path_resolved))
             output_path = str(output_path_resolved)
-        preview = result.head(5).to_dict(orient="records")
+        # Convert geometry to WKT for serialization
+        preview_df = result.head(5).copy()
+        if 'geometry' in preview_df.columns:
+            preview_df['geometry'] = preview_df['geometry'].apply(lambda g: g.wkt if g is not None else None)
+        preview = preview_df.to_dict(orient="records")
         return {
             "status": "success",
             "message": f"Overlay ({how}) completed successfully.",
@@ -229,7 +240,11 @@ def dissolve_gpd(gdf_path: str, by: str = None, output_path: str = None) -> Dict
             output_path_resolved.parent.mkdir(parents=True, exist_ok=True)
             result.to_file(str(output_path_resolved))
             output_path = str(output_path_resolved)
-        preview = result.head(5).to_dict(orient="records")
+        # Convert geometry to WKT for serialization
+        preview_df = result.head(5).copy()
+        if 'geometry' in preview_df.columns:
+            preview_df['geometry'] = preview_df['geometry'].apply(lambda g: g.wkt if g is not None else None)
+        preview = preview_df.to_dict(orient="records")
         return {
             "status": "success",
             "message": f"Dissolve completed successfully.",
@@ -261,7 +276,11 @@ def explode_gpd(gdf_path: str, output_path: str = None) -> Dict[str, Any]:
             output_path_resolved.parent.mkdir(parents=True, exist_ok=True)
             result.to_file(str(output_path_resolved))
             output_path = str(output_path_resolved)
-        preview = result.head(5).to_dict(orient="records")
+        # Convert geometry to WKT for serialization
+        preview_df = result.head(5).copy()
+        if 'geometry' in preview_df.columns:
+            preview_df['geometry'] = preview_df['geometry'].apply(lambda g: g.wkt if g is not None else None)
+        preview = preview_df.to_dict(orient="records")
         return {
             "status": "success",
             "message": "Explode completed successfully.",
@@ -297,7 +316,11 @@ def clip_vector(gdf_path: str, clip_path: str, output_path: str = None) -> Dict[
             output_path_resolved.parent.mkdir(parents=True, exist_ok=True)
             result.to_file(str(output_path_resolved))
             output_path = str(output_path_resolved)
-        preview = result.head(5).to_dict(orient="records")
+        # Convert geometry to WKT for serialization
+        preview_df = result.head(5).copy()
+        if 'geometry' in preview_df.columns:
+            preview_df['geometry'] = preview_df['geometry'].apply(lambda g: g.wkt if g is not None else None)
+        preview = preview_df.to_dict(orient="records")
         return {
             "status": "success",
             "message": "Clip completed successfully.",
@@ -335,7 +358,11 @@ def sjoin_gpd(left_path: str, right_path: str, how: str = "inner", predicate: st
             output_path_resolved.parent.mkdir(parents=True, exist_ok=True)
             result.to_file(str(output_path_resolved))
             output_path = str(output_path_resolved)
-        preview = result.head(5).to_dict(orient="records")
+        # Convert geometry to WKT for serialization
+        preview_df = result.head(5).copy()
+        if 'geometry' in preview_df.columns:
+            preview_df['geometry'] = preview_df['geometry'].apply(lambda g: g.wkt if g is not None else None)
+        preview = preview_df.to_dict(orient="records")
         return {
             "status": "success",
             "message": f"Spatial join ({how}, {predicate}) completed successfully.",
@@ -376,7 +403,11 @@ def sjoin_nearest_gpd(left_path: str, right_path: str, how: str = "left", max_di
             output_path_resolved.parent.mkdir(parents=True, exist_ok=True)
             result.to_file(str(output_path_resolved))
             output_path = str(output_path_resolved)
-        preview = result.head(5).to_dict(orient="records")
+        # Convert geometry to WKT for serialization
+        preview_df = result.head(5).copy()
+        if 'geometry' in preview_df.columns:
+            preview_df['geometry'] = preview_df['geometry'].apply(lambda g: g.wkt if g is not None else None)
+        preview = preview_df.to_dict(orient="records")
         return {
             "status": "success",
             "message": f"Nearest spatial join ({how}) completed successfully.",
@@ -412,7 +443,11 @@ def point_in_polygon(points_path: str, polygons_path: str, output_path: str = No
             output_path_resolved.parent.mkdir(parents=True, exist_ok=True)
             result.to_file(str(output_path_resolved))
             output_path = str(output_path_resolved)
-        preview = result.head(5).to_dict(orient="records")
+        # Convert geometry to WKT for serialization
+        preview_df = result.head(5).copy()
+        if 'geometry' in preview_df.columns:
+            preview_df['geometry'] = preview_df['geometry'].apply(lambda g: g.wkt if g is not None else None)
+        preview = preview_df.to_dict(orient="records")
         return {
             "status": "success",
             "message": "Point-in-polygon test completed successfully.",

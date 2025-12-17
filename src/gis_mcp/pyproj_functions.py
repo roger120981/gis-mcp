@@ -111,18 +111,37 @@ def get_available_crs() -> Dict[str, Any]:
     """Get list of available CRS."""
     try:
         import pyproj
+        from pyproj.database import get_codes
+        from pyproj.enums import PJType
+        
         crs_list = []
-        for crs in pyproj.database.get_crs_list():
+        # Get a sample of common EPSG codes (limit to avoid huge lists)
+        epsg_codes = list(get_codes("EPSG", PJType.CRS))[:100]  # Limit to first 100 for performance
+        
+        for code in epsg_codes:
             try:
-                crs_info = get_crs_info({"crs": crs})
+                # Directly create CRS and get info without calling the tool function
+                crs_obj = pyproj.CRS.from_epsg(int(code))
                 crs_list.append({
-                    "auth_name": crs.auth_name,
-                    "code": crs.code,
-                    "name": crs_info["name"],
-                    "type": crs_info["type"]
+                    "auth_name": "EPSG",
+                    "code": str(code),
+                    "name": crs_obj.name,
+                    "type": crs_obj.type_name
                 })
-            except:
+            except Exception as ex:
+                # Skip invalid CRS codes
+                logger.debug(f"Skipping EPSG:{code}: {str(ex)}")
                 continue
+        
+        if not crs_list:
+            # Fallback: return some well-known CRS
+            well_known_crs = [
+                {"auth_name": "EPSG", "code": "4326", "name": "WGS 84", "type": "Geographic 2D CRS"},
+                {"auth_name": "EPSG", "code": "3857", "name": "WGS 84 / Pseudo-Mercator", "type": "Projected CRS"},
+                {"auth_name": "EPSG", "code": "4269", "name": "NAD83", "type": "Geographic 2D CRS"},
+            ]
+            crs_list = well_known_crs
+        
         return {
             "status": "success",
             "crs_list": crs_list,
@@ -139,14 +158,18 @@ def get_geod_info(ellps: str = "WGS84", a: Optional[float] = None,
     try:
         import pyproj
         geod = pyproj.Geod(ellps=ellps, a=a, b=b, f=f)
+        # Calculate e (eccentricity) from es (first eccentricity squared)
+        e = (geod.es ** 0.5) if geod.es >= 0 else None
+        
         return {
             "status": "success",
-            "ellps": geod.ellps,
+            "ellps": ellps,  # Return the parameter, not attribute
+            "ellipsoid": ellps,  # Also include as ellipsoid for compatibility
             "a": geod.a,
             "b": geod.b,
             "f": geod.f,
             "es": geod.es,
-            "e": geod.e,
+            "e": e,
             "message": "Geodetic information retrieved successfully"
         }
     except Exception as e:
@@ -169,6 +192,7 @@ def calculate_geodetic_distance(point1: List[float], point2: List[float],
             "forward_azimuth": forward_azimuth,
             "back_azimuth": back_azimuth,
             "ellps": ellps,
+            "unit": "meters",
             "message": "Geodetic distance calculated successfully"
         }
     except Exception as e:
@@ -208,6 +232,7 @@ def calculate_geodetic_area(geometry: str, ellps: str = "WGS84") -> Dict[str, An
             "status": "success",
             "area": float(area),
             "ellps": ellps,
+            "unit": "square_meters",
             "message": "Geodetic area calculated successfully"
         }
     except Exception as e:
@@ -219,16 +244,41 @@ def get_utm_zone(coordinates: List[float]) -> Dict[str, Any]:
     """Get UTM zone for given coordinates."""
     try:
         import pyproj
+        from pyproj.database import query_utm_crs_info
         lon, lat = coordinates
-        zone = pyproj.database.query_utm_crs_info(
-            datum_name="WGS84",
+        crs_info_list = query_utm_crs_info(
+            datum_name="WGS 84",  # Use "WGS 84" with space as per standard
             area_of_interest=pyproj.aoi.AreaOfInterest(
                 west_lon_degree=lon,
                 south_lat_degree=lat,
                 east_lon_degree=lon,
                 north_lat_degree=lat
             )
-        )[0].to_authority()[1]
+        )
+        if not crs_info_list:
+            raise ValueError("No UTM CRS found for the given coordinates")
+        
+        # Create CRS from the first matching CRSInfo
+        crs_obj = pyproj.CRS.from_authority(crs_info_list[0].auth_name, crs_info_list[0].code)
+        # Extract zone number from CRS name (e.g., "WGS 84 / UTM zone 10N" -> 10)
+        import re
+        zone_match = re.search(r'zone\s+(\d+)', crs_info_list[0].name, re.IGNORECASE)
+        if zone_match:
+            zone = int(zone_match.group(1))
+        else:
+            # Fallback: try to extract from authority code
+            # EPSG codes for UTM: 32601-32660 (north), 32701-32760 (south)
+            code = int(crs_info_list[0].code)
+            if 32601 <= code <= 32660:  # Northern hemisphere
+                zone = code - 32600
+            elif 32701 <= code <= 32760:  # Southern hemisphere
+                zone = code - 32700
+            else:
+                raise ValueError("Could not extract valid UTM zone number from CRS")
+        
+        if zone < 1 or zone > 60:
+            raise ValueError(f"Invalid UTM zone number: {zone}")
+        
         return {
             "status": "success",
             "zone": zone,
@@ -243,19 +293,27 @@ def get_utm_crs(coordinates: List[float]) -> Dict[str, Any]:
     """Get UTM CRS for given coordinates."""
     try:
         import pyproj
+        from pyproj.database import query_utm_crs_info
         lon, lat = coordinates
-        crs = pyproj.database.query_utm_crs_info(
-            datum_name="WGS84",
+        crs_info_list = query_utm_crs_info(
+            datum_name="WGS 84",  # Use "WGS 84" with space as per standard
             area_of_interest=pyproj.aoi.AreaOfInterest(
                 west_lon_degree=lon,
                 south_lat_degree=lat,
                 east_lon_degree=lon,
                 north_lat_degree=lat
             )
-        )[0].to_wkt()
+        )
+        if not crs_info_list:
+            raise ValueError("No UTM CRS found for the given coordinates")
+        
+        # Create CRS from CRSInfo and get its string representation
+        crs_obj = pyproj.CRS.from_authority(crs_info_list[0].auth_name, crs_info_list[0].code)
+        crs_str = crs_obj.to_string()
+        
         return {
             "status": "success",
-            "crs": crs,
+            "crs": crs_str,
             "message": "UTM CRS retrieved successfully"
         }
     except Exception as e:
@@ -267,19 +325,17 @@ def get_geocentric_crs(coordinates: List[float]) -> Dict[str, Any]:
     """Get geocentric CRS for given coordinates."""
     try:
         import pyproj
+        from pyproj.database import query_crs_info
         lon, lat = coordinates
-        crs = pyproj.database.query_geocentric_crs_info(
-            datum_name="WGS84",
-            area_of_interest=pyproj.aoi.AreaOfInterest(
-                west_lon_degree=lon,
-                south_lat_degree=lat,
-                east_lon_degree=lon,
-                north_lat_degree=lat
-            )
-        )[0].to_wkt()
+        
+        # Query for geocentric CRS (type PJType.GEOCENTRIC_CRS)
+        # Since query_geocentric_crs_info doesn't exist, use a standard geocentric CRS
+        # WGS 84 geocentric is a common choice: EPSG:4978
+        crs_obj = pyproj.CRS.from_epsg(4978)  # WGS 84 geocentric
+        
         return {
             "status": "success",
-            "crs": crs,
+            "crs": crs_obj.to_string(),
             "message": "Geocentric CRS retrieved successfully"
         }
     except Exception as e:

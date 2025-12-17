@@ -958,16 +958,68 @@ def ols_with_spatial_diagnostics_safe(
         w.transform = "r"  # Row-standardize for regression
 
         # --- Step 5: Fit OLS with spatial diagnostics ---
-        ols_model = libpysal.model.ML_Lag.from_dataframe(gdf, y_field, x_fields, w=w, name_y=y_field, name_x=x_fields)
+        try:
+            from spreg import OLS
+        except ModuleNotFoundError:
+            return {"status": "error", "message": "The 'spreg' package is not installed. Install with: pip install spreg"}
+        
+        # Ensure y is shape (n, 1) and X is (n, k) for spreg
+        y = y.reshape(-1, 1) if len(y.shape) == 1 else y
+        if X.shape[1] != len(x_fields):
+            X = X.T if X.shape[0] == len(x_fields) else X
+        
+        # Run OLS with spatial diagnostics
+        ols_model = OLS(y, X, w=w, spat_diag=True, name_y=y_field, name_x=x_fields, name_ds="dataset")
 
         # --- Step 6: Collect results ---
+        # Extract Moran's I for residuals if available (from diagnostics)
+        moran_residual = None
+        moran_pvalue = None
+        if hasattr(ols_model, "diagnostics") and ols_model.diagnostics is not None:
+            diag = ols_model.diagnostics
+            # Check for Moran's I in diagnostics
+            if isinstance(diag, dict):
+                if "moran_res" in diag and diag["moran_res"] is not None:
+                    mor_res = diag["moran_res"]
+                    if len(mor_res) >= 2:
+                        moran_residual = float(mor_res[0])
+                        moran_pvalue = float(mor_res[1])
+        
+        # Extract beta names
+        beta_names = []
+        if hasattr(ols_model, "name_x") and ols_model.name_x:
+            beta_names = list(ols_model.name_x)
+        else:
+            beta_names = [f"x_{i}" for i in range(len(x_fields))]
+        
+        # Add constant to names if present
+        has_constant = hasattr(ols_model, "constant") and ols_model.constant
+        if has_constant:
+            beta_names = ["constant"] + beta_names
+        
+        # Extract betas
+        betas_dict = {}
+        if hasattr(ols_model, "betas") and ols_model.betas is not None:
+            betas_flat = ols_model.betas.flatten()
+            # Match betas to names
+            for i, beta_val in enumerate(betas_flat):
+                if i < len(beta_names):
+                    betas_dict[beta_names[i]] = float(beta_val)
+                else:
+                    betas_dict[f"beta_{i}"] = float(beta_val)
+        
+        # Extract standard errors
+        std_err_list = []
+        if hasattr(ols_model, "std_err") and ols_model.std_err is not None:
+            std_err_list = ols_model.std_err.tolist() if hasattr(ols_model.std_err, "tolist") else list(ols_model.std_err)
+        
         results = {
-            "n_obs": ols_model.n,
-            "r2": float(ols_model.r2),
-            "std_error": ols_model.std_err.tolist(),
-            "betas": {name: float(beta) for name, beta in zip(ols_model.name_x + [ols_model.name_y], ols_model.betas.flatten())},
-            "moran_residual": float(ols_model.moran_res[0]) if hasattr(ols_model, "moran_res") else None,
-            "moran_pvalue": float(ols_model.moran_res[1]) if hasattr(ols_model, "moran_res") else None,
+            "n_obs": int(ols_model.n) if hasattr(ols_model, "n") else int(len(y)),
+            "r2": float(ols_model.r2) if hasattr(ols_model, "r2") else None,
+            "std_error": std_err_list,
+            "betas": betas_dict,
+            "moran_residual": moran_residual,
+            "moran_pvalue": moran_pvalue,
         }
 
         return {

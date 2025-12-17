@@ -797,6 +797,7 @@ Made with [contrib.rocks](https://contrib.rocks).
 
 [![PyPI version](https://img.shields.io/pypi/v/gis-mcp.svg)](https://pypi.org/project/gis-mcp/)
 [![PyPI downloads](https://img.shields.io/pypi/dm/gis-mcp.svg)](https://pypi.org/project/gis-mcp/)
+[![Tests](https://github.com/mahdin75/gis-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/mahdin75/gis-mcp/actions/workflows/test.yml)
 <br/></br>
 
 [![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/mahdin75/gis-mcp)](https://archestra.ai/mcp-catalog/mahdin75__gis-mcp)
